@@ -264,12 +264,15 @@
         <h3>${guide.title}</h3><p>${guide.description}</p>
         <button class="secondary" data-action="guide" data-guide="${id}">播放${guide.title} · ${guide.duration}</button>
       </article>`).join("");
-    $("#screen-library").innerHTML = Object.entries(behaviorScreens).map(([id, screen]) => `
+    for (const [id, screen] of Object.entries(behaviorScreens)) {
+      const library = screen.pageSize ? $("#screen-library") : $("#quick-screen-library");
+      library.insertAdjacentHTML("beforeend", `
       <article class="panel practice-card">
         <span class="count">${screen.short} · ${screen.items.length} 题</span>
         <h3>${screen.title}</h3><p>${screen.description}</p>
         <button class="secondary" data-action="screen" data-scale="${id}">开始${screen.short}问卷</button>
-      </article>`).join("");
+      </article>`);
+    }
   }
 
   function openGuide(id) {
@@ -294,51 +297,117 @@
   function screenSources(screen) {
     return `<details class="screen-sources"><summary>问卷来源与评分依据</summary><p>${screen.credit}</p>
       <a class="text-link" href="${screen.source}" target="_blank" rel="noopener noreferrer">中文问卷</a> ·
-      <a class="text-link" href="${screen.paper}" target="_blank" rel="noopener noreferrer">原始研究</a>
+      <a class="text-link" href="${screen.paper}" target="_blank" rel="noopener noreferrer">${screen.referenceLabel || "原始研究"}</a>
+      ${screen.license ? ` · <a class="text-link" href="${screen.license}" target="_blank" rel="noopener noreferrer">CC BY-NC 4.0</a>` : ""}
+      ${screen.scoring ? `<p>${screen.scoring}</p>` : ""}
       ${screen.short === "GDT" ? ' · <a class="text-link" href="https://www.halleypontes.com/tests/" target="_blank" rel="noopener noreferrer">作者的使用说明</a>' : ""}</details>`;
   }
 
   function openScreen(scale) {
     const screen = behaviorScreens[scale];
-    const fields = screen.items.map((question, i) => `
-      <fieldset class="screen-question"><legend>${i + 1}. ${question}</legend>
-        <div class="answer-choices">${screen.options.map((label, index) => `
-          <label><input type="radio" name="item-${i}" value="${index}" required> ${label}</label>`).join("")}</div>
-      </fieldset>`).join("");
-    showDialog(heading("book", "green", `${screen.name}（${screen.short}）`) + `
-      <p>${screen.intro}</p>
-      <form id="screen-form" data-scale="${scale}">${fields}
-        <p class="screen-note">完成全部题目即可查看结果。你可以在下一步选择是否保存。</p>
-        <button class="primary" type="submit">查看本次结果</button>
-      </form>${screenSources(screen)}`);
+    const answers = Array(screen.items.length).fill(null);
+    const size = screen.pageSize || screen.items.length;
+    const pages = Math.ceil(answers.length / size);
+
+    function renderPage(page) {
+      const first = page * size;
+      const last = Math.min(first + size, answers.length);
+      const fields = screen.items.slice(first, last).map((question, i) => {
+        const q = first + i;
+        return `<fieldset class="screen-question"><legend>${q + 1}. ${question}</legend>
+          <div class="answer-choices">${screen.options.map((label, index) => `
+            <label><input type="radio" name="item-${q}" value="${index}" ${answers[q] === index ? "checked" : ""} required> ${label}</label>`).join("")}</div>
+        </fieldset>`;
+      }).join("");
+      const progress = pages > 1 ? `<div class="quiz-progress"><span>第 ${page + 1} 页，共 ${pages} 页</span>
+        <span>第 ${first + 1}–${last} 题 / 共 ${answers.length} 题</span></div>
+        <progress class="quiz-meter" value="${answers.filter(Number.isInteger).length}" max="${answers.length}" aria-label="已答题数"></progress>` : "";
+      showDialog(heading("book", "green", `${screen.name}（${screen.short}）`) + `
+        ${page === 0 ? `<p>${screen.intro}</p>` : '<p>请继续回顾过去 12 个月的情况。</p>'}${progress}
+        <form id="screen-form" data-scale="${scale}">${fields}
+          ${page === pages - 1 ? '<p class="screen-note">完成后即可查看结果，再选择是否保存。</p>' : ""}
+          <div class="actions">${page > 0 ? '<button type="button" id="previous-page" class="secondary">上一页</button>' : ""}
+            <button class="primary" type="submit">${page === pages - 1 ? "查看本次结果" : "下一页"}</button></div>
+        </form>${screenSources(screen)}`);
+      const form = $("#screen-form");
+      function rememberPage() {
+        const data = new FormData(form);
+        for (let i = first; i < last; i++) {
+          answers[i] = data.has(`item-${i}`) ? Number(data.get(`item-${i}`)) : null;
+        }
+      }
+      form.addEventListener("change", () => {
+        rememberPage();
+        const meter = content.querySelector(".quiz-meter");
+        if (meter) meter.value = answers.filter(Number.isInteger).length;
+      });
+      $("#previous-page")?.addEventListener("click", () => {rememberPage(); renderPage(page - 1);});
+      form.addEventListener("submit", event => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        rememberPage();
+        if (page + 1 < pages) renderPage(page + 1);
+        else evaluateScreen(scale, answers);
+      });
+    }
+    renderPage(0);
   }
 
   function scoreLabel(scale, score) {
-    if (scale === "gdt") return `${score} 分（范围 4–20）`;
-    return score > 0 ? "筛查提示风险" : "本次未检出风险信号";
+    if (scale === "bbgs") return score > 0 ? "筛查提示风险" : "本次未检出风险信号";
+    const screen = behaviorScreens[scale];
+    const band = screen.bands?.find(b => score <= b.max);
+    if (band) return `${score} / ${screen.maximum} 分 · ${band.label}`;
+    return `${score} 分（范围 ${screen.minimum}–${screen.maximum}）`;
   }
 
-  function evaluateScreen(form) {
-    if (!form.reportValidity()) return;
-    const scale = form.dataset.scale;
+  function describeScores(scale, score, points) {
     const screen = behaviorScreens[scale];
-    const inputs = new FormData(form);
-    let score = screen.minimum;
-    for (let i = 0; i < screen.items.length; i++) {
-      const raw = inputs.get(`item-${i}`);
-      const value = Number(raw);
-      if (raw === null || !Number.isInteger(value) || value < 0 || value >= screen.options.length) return;
-      score += value;
+    if (screen.bands) {
+      const band = screen.bands.find(b => score <= b.max);
+      const ranges = screen.bands.map((b,i) => {
+        const min = i ? screen.bands[i - 1].max + 1 : 0;
+        return `<li${band === b ? ' class="current-band"' : ''}><span>${min === b.max ? min : `${min}–${b.max}`} 分</span>
+          ${b.label}${band === b ? "（本次）" : ""}</li>`;
+      }).join("");
+      const reported = points.flatMap((value, i) => value > 0
+        ? [`<li>${screen.topics[i]} · ${screen.options[value]}</li>`] : []);
+      const impacts = reported.length ? `<h3>你在回答中提到的情况</h3><ul class="reported-impacts">${reported.join("")}</ul>` : "";
+      return `<p>${band.guidance}</p><h3>分数怎么读</h3><ul class="band-list">${ranges}</ul>
+        ${impacts}<p class="screen-note">区间反映过去一年的自报情况。临床诊断还需要了解具体经历和生活影响。</p>`;
     }
+    if (screen.domains) {
+      const rows = screen.domains.map(domain => {
+        const sum = domain.items.reduce((total, n) => total + points[n - 1], 0);
+        const mean = (sum / domain.items.length).toFixed(1);
+        return `<div class="domain-row"><dt>${domain.name}<span>均分 ${mean} / 5</span></dt><dd>${domain.detail}</dd></div>`;
+      }).join("");
+      return `<p>${screen.scoring}</p><h3>五个维度的表现</h3>
+        <p class="screen-note">各维度题数不同，以下列出每题平均分（1–5）。可以挑一个与你近况最相关的方面，回想一件具体的事。</p>
+        <dl class="domain-list">${rows}</dl>
+        <p>如果睡眠、学习、工作或关系持续受到影响，可以带着这些具体经历与心理健康专业人员讨论。</p>`;
+    }
+    if (scale === "gdt") return "<p>四题各计 1 到 5 分。总分越高，表示你报告的游戏相关困扰越多。如果游戏已影响生活或关系，可以带着结果找专业人员讨论。</p>";
+    return score > 0
+      ? `<p>你有 ${score} 项回答「是」。任一项回答「是」就提示值得进一步评估。可以把近期困扰你的赌博经历告诉心理、精神卫生或成瘾专科人员。</p>`
+      : "<p>你对三题都回答了「否」。如果赌博仍让你担心，或已经影响财务和生活，仍然可以寻求支持。</p>";
+  }
+
+  function evaluateScreen(scale, answers) {
+    const screen = behaviorScreens[scale];
+    if (answers.length !== screen.items.length || !answers.every(n => Number.isInteger(n) && n >= 0 && n < screen.options.length)) return;
+    const lowestItemScore = screen.minimum / screen.items.length;
+    const points = answers.map((index, i) => {
+      const adjusted = screen.reverse?.includes(i + 1) ? screen.options.length - 1 - index : index;
+      return lowestItemScore + adjusted;
+    });
+    const score = points.reduce((total, n) => total + n, 0);
     const time = Date.now();
-    const guidance = scale === "gdt"
-      ? "四题各计 1 到 5 分。总分越高，表示你报告的游戏相关困扰越多。如果游戏已影响生活或关系，可以带着结果找专业人员讨论。"
-      : score > 0
-        ? `你有 ${score} 项回答「是」。任一项回答「是」就提示值得进一步评估。可以把近期困扰你的赌博经历告诉心理、精神卫生或成瘾专科人员。`
-        : "你对三题都回答了「否」。如果赌博仍让你担心，或已经影响财务和生活，仍然可以寻求支持。";
+    const previous = getScreenRecords().find(item => item.scale === scale);
+    const comparison = previous ? `<p class="screen-note">上次同量表结果 · ${recordDate(previous.time)} · ${scoreLabel(scale, previous.score)}。两次结果可能涵盖相同的经历。</p>` : "";
     showDialog(heading("book", "green", `${screen.short} 自评结果`) + `
-      <div class="screen-score">${scoreLabel(scale, score)}</div><p>${guidance}</p>
-      <p class="screen-note">回顾期为过去 12 个月。保存后，只有日期、问卷名称和本次结果会留在当前浏览器。逐题答案不会保存。</p>
+      <div class="screen-score">${scoreLabel(scale, score)}</div>${describeScores(scale, score, points)}${comparison}
+      <p class="screen-note">回顾期为过去 12 个月。你可以只查看结果，也可以把日期、量表名称和总结果保存在本机。逐题答案${screen.domains ? "和维度均分" : ""}不会写入记录。</p>
       <div class="actions"><button id="save-screen" class="primary">保存到我的记录</button>
         <button class="secondary" data-action="close">不保存并关闭</button></div>
       <a class="text-link result-support" href="#support">查看支持资源</a>${screenSources(screen)}`);
@@ -409,10 +478,6 @@
   }
   document.addEventListener("submit", event => {
     event.preventDefault();
-    if(event.target.id === "screen-form") {
-      evaluateScreen(event.target);
-      return;
-    }
     if(event.target.id === "checkin-form") {
       if(!Number.isInteger(draftMood)) {
         $("#form-error").textContent = "请先选择一个心情。";
