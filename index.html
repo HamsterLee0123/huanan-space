@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17594e">
+  <meta name="description" content="当赌博、游戏或购物的冲动出现时，用缓岸做一次短暂停顿，记录感受，找到下一步支持。">
+  <title>缓岸 · 行为成瘾自助空间</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要内容</a>
+  <header class="topbar">
+    <div class="top-inner">
+      <a class="brand" href="#today" aria-label="缓岸首页"><img src="assets/mark.svg" alt="" width="42" height="42"><span>缓岸<small>HARBOR</small></span></a>
+      <nav aria-label="主导航">
+        <a href="#today" data-page="today">今日空间</a>
+        <a href="#journal" data-page="journal">我的记录</a>
+        <a href="#support" data-page="support">支持资源</a>
+      </nav>
+      <button class="privacy" data-action="privacy"><i data-icon="lock"></i><span>本地隐私</span></button>
+    </div>
+  </header>
+  <main id="main" class="container" tabindex="-1">
+    <noscript>请启用 JavaScript 以使用计时和记录工具。如果此刻想下注，可以先关掉投注页面，走到另一个房间，给信任的人发一句「我想找个人聊十分钟」。</noscript>
+    <section id="today" class="page">
+      <div class="hero">
+        <div class="hero-art" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <div class="date-line"><i data-icon="sun"></i><time id="today-date"></time></div>
+          <h1>先停一下，<br>给自己一点空间。</h1>
+          <p>想下注、打开游戏或下单时，可以先来这里。<br class="desktop">用三分钟缓一缓，再决定接下来做什么。</p>
+          <button class="primary" data-action="timer"><i data-icon="pause"></i>开始 3 分钟缓冲</button>
+        </div>
+      </div>
+      <div class="section-head"><h2>今日自我照顾</h2><span class="rule"></span></div>
+      <div class="daily-grid">
+        <section class="panel mood-panel">
+          <div class="panel-heading"><span class="icon-tile peach"><i data-icon="heart"></i></span><h3>此刻感觉怎么样？</h3></div>
+          <p id="mood-hint">选一个最接近的感受，给今天留个记录。</p>
+          <div class="moods" id="home-moods" aria-label="选择此刻的心情"></div>
+        </section>
+        <section class="panel progress-panel">
+          <div class="panel-heading"><span class="icon-tile green"><i data-icon="calendar"></i></span><h3>本周足迹</h3><a class="minor-link" href="#journal">查看记录</a></div>
+          <p id="week-count"></p>
+          <div id="week" class="week" aria-label="本周的记录日期"></div>
+        </section>
+      </div>
+      <div class="section-head"><h2>随手可用的工具</h2><span class="rule"></span></div>
+      <div class="tool-grid">
+        <button class="tool" data-action="ground"><span class="icon-tile blue"><i data-icon="anchor"></i></span><span><strong>感官着陆</strong><small>用五种感官回到当下</small></span></button>
+        <button class="tool" data-action="plan"><span class="icon-tile peach"><i data-icon="map"></i></span><span><strong>我的应对计划</strong><small>提前想好冲动时的一步</small></span></button>
+        <a class="tool" href="#support"><span class="icon-tile lilac"><i data-icon="people"></i></span><span><strong>找个人聊聊</strong><small>联系身边的人或专业支持</small></span></a>
+      </div>
+    </section>
+    <section id="journal" class="page" hidden aria-labelledby="journal-title">
+      <div class="subhead"><div class="section-kicker"><i data-icon="book"></i> 自我观察</div><h1 id="journal-title">我的记录</h1><p>回看哪些情境容易带来冲动，哪些小事曾经帮到你。</p><button class="primary" data-action="checkin"><i data-icon="pencil"></i>记录今天</button></div>
+      <div class="section-head"><h2>每日记录</h2><span class="rule"></span><span class="count" id="history-count"></span></div>
+      <div id="history"></div>
+    </section>
+    <section id="support" class="page" hidden aria-labelledby="support-title">
+      <div class="subhead support-head"><div class="section-kicker"><i data-icon="people"></i> 向外求助</div><h1 id="support-title">支持资源</h1><p>当冲动反复出现，或已经影响到生活，你可以找人一起面对。</p></div>
+      <div class="section-head"><h2>此刻可以做什么</h2><span class="rule"></span></div>
+      <div class="resource-grid">
+        <article class="panel resource"><span class="icon-tile peach"><i data-icon="chat"></i></span><h3>联系信任的人</h3><p>挑一个愿意听你说话的人。可以用这句话开头，也可以改成自己的说法。</p><blockquote>我现在有点想回到以前的习惯。你方便陪我聊十分钟，或者一起走走吗？</blockquote><button class="secondary" data-action="copy">复制这句话</button></article>
+        <article class="panel resource"><span class="icon-tile green"><i data-icon="shield"></i></span><h3>给下注多设一道门槛</h3><ul><li>关闭投注页面，退出推送下注消息的群组。</li><li>查看平台的自我排除功能，以及银行是否支持屏蔽博彩交易。</li><li>如果刚刚输钱，先把借贷或充值页面关掉，约信任的人谈谈接下来的生活开支。</li></ul><button class="secondary" data-action="plan">写下我的计划</button></article>
+        <article class="panel resource"><span class="icon-tile lilac"><i data-icon="people"></i></span><h3>寻找持续支持</h3><p>可以联系当地医院的心理、精神卫生或成瘾专科，描述冲动出现的频率，以及它对睡眠、关系或财务的影响。</p><p>也可以通过 Gamblers Anonymous 查询线上或线下的赌博互助聚会。</p><a class="text-link" href="https://gamblersanonymous.org/" target="_blank" rel="noopener noreferrer">访问 Gamblers Anonymous（英文）</a></article>
+      </div>
+    </section>
+  </main>
+  <footer><div class="container footer-row"><span class="footer-brand"><img src="assets/mark.svg" alt="" width="24" height="24">缓岸</span><span>自助工具仅供日常支持。如需诊疗，请联系专业人员。</span><button class="minor-link" data-action="privacy">隐私说明</button></div></footer>
+  <dialog id="dialog" aria-labelledby="dlg-title"><div class="dialog-inner"><button class="close" data-action="close" aria-label="关闭"><i data-icon="close"></i></button><div id="dialog-content"></div></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
