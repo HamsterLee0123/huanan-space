@@ -16,6 +16,7 @@
     pencil: '<path d="m4 16-1 5 5-1L20 8l-4-4Zm9-9 4 4"/>',
     chat: '<path d="M21 12a8.5 8.5 0 0 1-9 8.5 10 10 0 0 1-4-.8L3 21l1.3-4.7A9 9 0 1 1 21 12Z"/><path d="M8 12h.1m3.9 0h.1m3.9 0h.1"/>',
     shield: '<path d="m12 2 8 4v6c0 5-5 9-8 10-3-1-8-5-8-10V6Zm-4 10 3 3 5-6"/>',
+    headphones: '<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="12" width="4.5" height="8" rx="2"/><rect x="16.5" y="12" width="4.5" height="8" rx="2"/>',
     close: '<path d="m6 6 12 12M18 6 6 18"/>'
   };
   const tile = (icon, color) => `<span class="icon-tile ${color}"><i data-icon="${icon}"></i></span>`;
@@ -96,6 +97,7 @@
     }
     $("#week").innerHTML = days.join("");
     $("#week-count").textContent = count ? `这周已留下 ${count} 天的记录。` : "本周还没有记录，今天可以是第一天。";
+    updateScreenHistory();
     const dates = listDates();
     $("#history-count").textContent = dates.length + " 天";
     const history = $("#history");
@@ -122,7 +124,7 @@
   }
   function showPage(scroll = false) {
     const wanted = location.hash.slice(1);
-    const page = ["today","journal","support"].includes(wanted) ? wanted : "today";
+    const page = ["today","meditation","assessment","journal","support"].includes(wanted) ? wanted : "today";
     document.querySelectorAll(".page").forEach(el => el.hidden = el.id !== page);
     document.querySelectorAll("nav a").forEach(a => {
       if(a.dataset.page === page) a.setAttribute("aria-current","page");
@@ -134,7 +136,7 @@
   let ticker;
   function showDialog(markup) {
     clearInterval(ticker);
-    $("#timer-audio")?.pause();
+    content.querySelector("audio")?.pause();
     content.innerHTML = markup + '<div id="form-error" role="alert"></div>';
     drawIcons(content);
     if(!dialog.open) dialog.showModal();
@@ -251,11 +253,166 @@
     step=index;
     showDialog(heading("anchor","blue","感官着陆") + `<div class="step-count">第 ${index+1} 步，共 5 步</div><div class="ground-task">${steps[index][0]}</div><p>${steps[index][1]}</p><div class="actions"><button class="primary" data-action="${index===4?"ground-done":"ground-next"}">${index===4?"完成练习":"下一步"}</button>${index?'<button class="secondary" data-action="ground-prev">上一步</button>':""}</div>`);
   }
+
+  const screenPrefix = prefix + "screen:";
+  const validRecordId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  function renderLibraries() {
+    $("#guide-library").innerHTML = Object.entries(mindfulnessGuides).map(([id, guide]) => `
+      <article class="panel practice-card">
+        ${tile("headphones", "blue")}
+        <h3>${guide.title}</h3><p>${guide.description}</p>
+        <button class="secondary" data-action="guide" data-guide="${id}">播放${guide.title} · ${guide.duration}</button>
+      </article>`).join("");
+    $("#screen-library").innerHTML = Object.entries(behaviorScreens).map(([id, screen]) => `
+      <article class="panel practice-card">
+        <span class="count">${screen.short} · ${screen.items.length} 题</span>
+        <h3>${screen.title}</h3><p>${screen.description}</p>
+        <button class="secondary" data-action="screen" data-scale="${id}">开始${screen.short}问卷</button>
+      </article>`).join("");
+  }
+
+  function openGuide(id) {
+    const guide = mindfulnessGuides[id];
+    showDialog(heading("headphones", "blue", guide.title) + `
+      <p>普通话合成语音 · ${guide.duration}。引导之间留有安静的练习时间。</p>
+      <audio id="guide-player" controls preload="metadata" aria-label="${guide.title}语音引导"></audio>
+      <div id="guide-status" role="status"></div>
+      <details class="transcript"><summary>阅读引导词</summary>${guide.transcript.map(line => `<p>${line}</p>`).join("")}</details>
+      <div class="actions"><button class="secondary" data-action="close">结束练习</button></div>`);
+    const player = $("#guide-player");
+    const status = $("#guide-status");
+    player.addEventListener("error", () => {status.textContent = "音频暂时无法加载。你可以展开引导词，或稍后重新打开练习。";});
+    player.addEventListener("playing", () => {status.textContent = "";});
+    player.addEventListener("ended", () => {status.textContent = "这段练习已完成。你可以再听一次，或结束练习。";});
+    player.src = `assets/guide-${id}.mp3`;
+    player.play().catch(error => {
+      if (error.name === "NotAllowedError") status.textContent = "点播放器中的播放按钮开始。";
+    });
+  }
+
+  function screenSources(screen) {
+    return `<details class="screen-sources"><summary>问卷来源与评分依据</summary><p>${screen.credit}</p>
+      <a class="text-link" href="${screen.source}" target="_blank" rel="noopener noreferrer">中文问卷</a> ·
+      <a class="text-link" href="${screen.paper}" target="_blank" rel="noopener noreferrer">原始研究</a>
+      ${screen.short === "GDT" ? ' · <a class="text-link" href="https://www.halleypontes.com/tests/" target="_blank" rel="noopener noreferrer">作者的使用说明</a>' : ""}</details>`;
+  }
+
+  function openScreen(scale) {
+    const screen = behaviorScreens[scale];
+    const fields = screen.items.map((question, i) => `
+      <fieldset class="screen-question"><legend>${i + 1}. ${question}</legend>
+        <div class="answer-choices">${screen.options.map((label, index) => `
+          <label><input type="radio" name="item-${i}" value="${index}" required> ${label}</label>`).join("")}</div>
+      </fieldset>`).join("");
+    showDialog(heading("book", "green", `${screen.name}（${screen.short}）`) + `
+      <p>${screen.intro}</p>
+      <form id="screen-form" data-scale="${scale}">${fields}
+        <p class="screen-note">完成全部题目即可查看结果。你可以在下一步选择是否保存。</p>
+        <button class="primary" type="submit">查看本次结果</button>
+      </form>${screenSources(screen)}`);
+  }
+
+  function scoreLabel(scale, score) {
+    if (scale === "gdt") return `${score} 分（范围 4–20）`;
+    return score > 0 ? "筛查提示风险" : "本次未检出风险信号";
+  }
+
+  function evaluateScreen(form) {
+    if (!form.reportValidity()) return;
+    const scale = form.dataset.scale;
+    const screen = behaviorScreens[scale];
+    const inputs = new FormData(form);
+    let score = screen.minimum;
+    for (let i = 0; i < screen.items.length; i++) {
+      const raw = inputs.get(`item-${i}`);
+      const value = Number(raw);
+      if (raw === null || !Number.isInteger(value) || value < 0 || value >= screen.options.length) return;
+      score += value;
+    }
+    const time = Date.now();
+    const guidance = scale === "gdt"
+      ? "四题各计 1 到 5 分。总分越高，表示你报告的游戏相关困扰越多。如果游戏已影响生活或关系，可以带着结果找专业人员讨论。"
+      : score > 0
+        ? `你有 ${score} 项回答「是」。任一项回答「是」就提示值得进一步评估。可以把近期困扰你的赌博经历告诉心理、精神卫生或成瘾专科人员。`
+        : "你对三题都回答了「否」。如果赌博仍让你担心，或已经影响财务和生活，仍然可以寻求支持。";
+    showDialog(heading("book", "green", `${screen.short} 自评结果`) + `
+      <div class="screen-score">${scoreLabel(scale, score)}</div><p>${guidance}</p>
+      <p class="screen-note">回顾期为过去 12 个月。保存后，只有日期、问卷名称和本次结果会留在当前浏览器。逐题答案不会保存。</p>
+      <div class="actions"><button id="save-screen" class="primary">保存到我的记录</button>
+        <button class="secondary" data-action="close">不保存并关闭</button></div>
+      <a class="text-link result-support" href="#support">查看支持资源</a>${screenSources(screen)}`);
+    const id = crypto.randomUUID();
+    $("#save-screen").addEventListener("click", () => {
+      if (save(screenPrefix + id, {scale, score, time})) finish("自评结果已保存在本机。");
+    });
+  }
+
+  function getScreenRecords() {
+    try {
+      const records = [];
+      for (const key of Object.keys(localStorage)) {
+        if (!key.startsWith(screenPrefix)) continue;
+        const id = key.slice(screenPrefix.length);
+        const item = read(key);
+        if (!validRecordId.test(id) || !item || !Object.hasOwn(behaviorScreens, item.scale)) continue;
+        const screen = behaviorScreens[item.scale];
+        if (!Number.isInteger(item.score) || item.score < screen.minimum || item.score > screen.maximum) continue;
+        if (!Number.isSafeInteger(item.time) || Number.isNaN(new Date(item.time).getTime())) continue;
+        records.push({id, scale:item.scale, score:item.score, time:item.time});
+      }
+      return records.sort((a,b) => b.time - a.time);
+    } catch {return [];}
+  }
+
+  function recordDate(time) {
+    return new Date(time).toLocaleString("zh-CN", {year:"numeric", month:"long", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false});
+  }
+
+  function updateScreenHistory() {
+    const records = getScreenRecords();
+    const summary = $("#screen-summary");
+    if (!records.length) {
+      summary.textContent = "还没有保存的自评结果。";
+      $("#screen-history").innerHTML = '<div class="panel">还没有保存的自评结果。完成问卷后，点「保存到我的记录」，下次就能在这里回看。</div>';
+      return;
+    }
+    const latest = records[0];
+    summary.textContent = `最近一次 · ${recordDate(latest.time)} · ${behaviorScreens[latest.scale].short} · ${scoreLabel(latest.scale, latest.score)}`;
+    const groups = [];
+    for (const [scale, screen] of Object.entries(behaviorScreens)) {
+      const matching = records.filter(item => item.scale === scale);
+      if (!matching.length) continue;
+      const rows = matching.map(item => `<li class="screen-row">
+        <span><time datetime="${new Date(item.time).toISOString()}">${recordDate(item.time)}</time>
+        <strong>${scoreLabel(scale, item.score)}</strong></span>
+        <button class="minor-link" data-action="screen-remove" data-record="${item.id}" aria-label="删除 ${recordDate(item.time)} 的 ${screen.short} 结果">删除</button></li>`).join("");
+      groups.push(`<section class="panel screen-group"><h3>${screen.title} · ${screen.short}</h3><ol>${rows}</ol></section>`);
+    }
+    $("#screen-history").innerHTML = groups.join("");
+  }
+
+  function confirmScreenRemoval(id) {
+    const item = getScreenRecords().find(record => record.id === id);
+    if (!item) return;
+    showDialog(heading("book", "peach", "删除这次自评？") + `
+      <p>将从本机删除 ${recordDate(item.time)} 的 ${behaviorScreens[item.scale].short} 结果。</p>
+      <div class="actions"><button class="primary" data-action="close">保留结果</button>
+      <button id="remove-screen" class="secondary danger">确认删除</button></div>`);
+    $("#remove-screen").addEventListener("click", () => {
+      if (save(screenPrefix + id, null)) finish("已删除这次自评结果。");
+    });
+  }
+
   function privacy() {
-    showDialog(heading("lock","green","本地隐私") + `<p>心情、笔记和应对计划仅保存在当前浏览器中，网站不会将这些内容上传。清理浏览器数据或离开无痕窗口时，记录可能会消失。</p><p>共用设备上的其他人可通过同一个浏览器查看记录。访问外部支持网站时，适用对方的隐私政策。</p><div class="actions"><button class="secondary danger" data-action="clear-prompt">清除本机缓岸数据</button></div>`);
+    showDialog(heading("lock","green","本地隐私") + `<p>你选择保存的自评结果、心情、笔记和应对计划仅保存在当前浏览器中，网站不会将这些内容上传。清理浏览器数据或离开无痕窗口时，记录可能会消失。</p><p>共用设备上的其他人可通过同一个浏览器查看记录。访问外部支持网站时，适用对方的隐私政策。</p><div class="actions"><button class="secondary danger" data-action="clear-prompt">清除本机缓岸数据</button></div>`);
   }
   document.addEventListener("submit", event => {
     event.preventDefault();
+    if(event.target.id === "screen-form") {
+      evaluateScreen(event.target);
+      return;
+    }
     if(event.target.id === "checkin-form") {
       if(!Number.isInteger(draftMood)) {
         $("#form-error").textContent = "请先选择一个心情。";
@@ -277,6 +434,9 @@
     switch(action) {
       case "close": dialog.close(); break;
       case "timer": timer(); break;
+      case "guide": openGuide(button.dataset.guide); break;
+      case "screen": openScreen(button.dataset.scale); break;
+      case "screen-remove": confirmScreenRemoval(button.dataset.record); break;
       case "pause":
         if(running) {tick(); if(!remaining) break; running=false;}
         else {finishAt=Date.now()+remaining*1000; running=true;tick();}
@@ -304,7 +464,7 @@
       case "keep-entry": checkin(draftDate); break;
       case "delete-confirm": if(save(dayPrefix+draftDate,null)) finish("已删除这条记录。"); break;
       case "clear-prompt":
-        showDialog(heading("lock","peach","清除缓岸数据？")+`<p>这会删除当前浏览器中的全部缓岸记录和应对计划。清除后无法恢复。</p><div class="actions"><button class="primary" data-action="privacy">保留数据</button><button class="secondary danger" data-action="clear-confirm">确认清除</button></div>`);
+        showDialog(heading("lock","peach","清除缓岸数据？")+`<p>这会删除当前浏览器中的全部缓岸记录、自评结果和应对计划。清除后无法恢复。</p><div class="actions"><button class="primary" data-action="privacy">保留数据</button><button class="secondary danger" data-action="clear-confirm">确认清除</button></div>`);
         break;
       case "clear-confirm":
         try {
@@ -324,17 +484,19 @@
     if (dialog.open) return;
     clearInterval(ticker);
     running = false;
-    $("#timer-audio")?.pause();
+    content.querySelector("audio")?.pause();
+    content.replaceChildren();
   });
   window.addEventListener("pagehide", () => {
-    if (dialog.open && $("#timer-audio")) {
-      $("#timer-audio").pause();
+    if (dialog.open && content.querySelector("audio")) {
+      content.querySelector("audio").pause();
       dialog.close();
     }
   });
   window.addEventListener("hashchange",()=>{if(dialog.open) dialog.close();showPage(true);});
   window.addEventListener("storage",updateDashboard);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden) updateDashboard();});
+  renderLibraries();
   drawIcons(document);
   showPage();
 })();

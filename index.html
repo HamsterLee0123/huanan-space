@@ -7,8 +7,9 @@
   <meta name="description" content="当赌博、游戏或购物的冲动出现时，用缓岸做一次短暂停顿，记录感受，找到下一步支持。">
   <title>缓岸 · 行为成瘾自助空间</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2">
-  <script defer src="app.js?v=2"></script>
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script defer src="practice-data.js?v=1"></script>
+  <script defer src="app.js?v=3"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳到主要内容</a>
@@ -17,6 +18,8 @@
       <a class="brand" href="#today" aria-label="缓岸首页"><img src="assets/mark.svg" alt="" width="42" height="42"><span>缓岸<small>HARBOR</small></span></a>
       <nav aria-label="主导航">
         <a href="#today" data-page="today">今日空间</a>
+        <a href="#meditation" data-page="meditation">正念练习</a>
+        <a href="#assessment" data-page="assessment">行为自评</a>
         <a href="#journal" data-page="journal">我的记录</a>
         <a href="#support" data-page="support">支持资源</a>
       </nav>
@@ -49,16 +52,35 @@
         </section>
       </div>
       <div class="section-head"><h2>随手可用的工具</h2><span class="rule"></span></div>
+      <div class="feature-pair">
+        <a class="tool" href="#meditation"><span class="icon-tile blue"><i data-icon="headphones"></i></span><span><strong>正念冥想</strong><small>听普通话引导，练习呼吸觉察、身体扫描和冲动冲浪</small></span></a>
+        <a class="tool" href="#assessment"><span class="icon-tile green"><i data-icon="book"></i></span><span><strong>行为自评与追踪</strong><small>用专业问卷回顾赌博或游戏行为，查看历次结果</small></span></a>
+      </div>
       <div class="tool-grid">
         <button class="tool" data-action="ground"><span class="icon-tile blue"><i data-icon="anchor"></i></span><span><strong>感官着陆</strong><small>用五种感官回到当下</small></span></button>
         <button class="tool" data-action="plan"><span class="icon-tile peach"><i data-icon="map"></i></span><span><strong>我的应对计划</strong><small>提前想好冲动时的一步</small></span></button>
         <a class="tool" href="#support"><span class="icon-tile lilac"><i data-icon="people"></i></span><span><strong>找个人聊聊</strong><small>联系身边的人或专业支持</small></span></a>
       </div>
     </section>
+    <section id="meditation" class="page" hidden aria-labelledby="meditation-title">
+      <div class="subhead"><div class="section-kicker"><i data-icon="headphones"></i> 普通话语音引导</div><h1 id="meditation-title">正念冥想</h1><p>找一个可以安心停留的地方。跟着声音练习，也可以睁着眼睛读文字稿，按自己的节奏停下来。</p></div>
+      <div class="section-head"><h2>选择练习</h2><span class="rule"></span></div>
+      <div id="guide-library" class="resource-grid"></div>
+    </section>
+    <section id="assessment" class="page" hidden aria-labelledby="assessment-title">
+      <div class="subhead support-head"><div class="section-kicker"><i data-icon="book"></i> 自我观察</div><h1 id="assessment-title">行为自评与追踪</h1><p>选择与你有关的行为，回顾过去 12 个月。问卷供成年人自我筛查，临床诊断需要专业评估。</p></div>
+      <div class="section-head"><h2>选择问卷</h2><span class="rule"></span></div>
+      <div id="screen-library" class="feature-pair"></div>
+      <div class="section-head"><h2>历次自评</h2><span class="rule"></span></div>
+      <p class="screen-history-note">每次结果都回顾过去一年。相邻两次的回顾期可能重叠，短期变化请结合每日记录理解。</p>
+      <div id="screen-history"></div>
+    </section>
     <section id="journal" class="page" hidden aria-labelledby="journal-title">
       <div class="subhead"><div class="section-kicker"><i data-icon="book"></i> 自我观察</div><h1 id="journal-title">我的记录</h1><p>回看哪些情境容易带来冲动，哪些小事曾经帮到你。</p><button class="primary" data-action="checkin"><i data-icon="pencil"></i>记录今天</button></div>
       <div class="section-head"><h2>每日记录</h2><span class="rule"></span><span class="count" id="history-count"></span></div>
       <div id="history"></div>
+      <div class="section-head"><h2>行为自评</h2><span class="rule"></span><a class="minor-link" href="#assessment">查看历次自评</a></div>
+      <div class="panel" id="screen-summary"></div>
     </section>
     <section id="support" class="page" hidden aria-labelledby="support-title">
       <div class="subhead support-head"><div class="section-kicker"><i data-icon="people"></i> 向外求助</div><h1 id="support-title">支持资源</h1><p>当冲动反复出现，或已经影响到生活，你可以找人一起面对。</p></div>
