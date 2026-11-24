@@ -134,6 +134,7 @@
   let ticker;
   function showDialog(markup) {
     clearInterval(ticker);
+    $("#timer-audio")?.pause();
     content.innerHTML = markup + '<div id="form-error" role="alert"></div>';
     drawIcons(content);
     if(!dialog.open) dialog.showModal();
@@ -166,11 +167,62 @@
   }
   const pauseSeconds = 180;
   let finishAt, remaining, running;
+  const soundFiles = {
+    noise: "assets/white-noise.mp3",
+    music: "assets/quiet-piano.mp3"
+  };
+
+  function soundFailed(player) {
+    if (!dialog.open || player !== $("#timer-audio") || !running) return;
+    const selected = content.querySelector('input[name="timer-sound"]:checked');
+    if (!soundFiles[selected?.value] || player.getAttribute("src") !== soundFiles[selected.value]) return;
+    player.pause();
+    $("#sound-off").checked = true;
+    $("#sound-status").textContent = "声音暂时无法播放，计时仍在继续。可以重新选择声音再试一次。";
+  }
+
+  function updateTimerSound() {
+    const player = $("#timer-audio");
+    if (!player) return;
+    const choice = content.querySelector('input[name="timer-sound"]:checked').value;
+    const file = soundFiles[choice];
+    $("#sound-status").textContent = "";
+    if (!running || !file) {
+      player.pause();
+      return;
+    }
+    if (player.getAttribute("src") !== file || player.error) player.src = file;
+    player.play().catch(error => {
+      if (error.name !== "AbortError" && player.getAttribute("src") === file) soundFailed(player);
+    });
+  }
+
   function timer() {
     remaining = pauseSeconds;
     running = true;
     finishAt = Date.now()+remaining*1000;
-    showDialog(heading("pause","green","三分钟缓冲") + `<p>先把投注、游戏或购物页面关上。现在只需要做眼前这一步。</p><div class="timer-digits" id="time-left" role="timer" aria-label="剩余时间">03:00</div><div class="timer-track" aria-hidden="true"><span id="time-progress"></span></div><div id="timer-prompt" aria-live="polite"></div><div class="actions"><button class="primary" data-action="pause" id="pause-button">暂停计时</button><button class="secondary" data-action="close">结束练习</button></div>`);
+    showDialog(heading("pause","green","三分钟缓冲") + `
+      <p>先把投注、游戏或购物页面关上。现在只需要做眼前这一步。</p>
+      <div class="timer-digits" id="time-left" role="timer" aria-label="剩余时间">03:00</div>
+      <div class="timer-track" aria-hidden="true"><span id="time-progress"></span></div>
+      <div id="timer-prompt" aria-live="polite"></div>
+      <fieldset class="timer-sounds">
+        <legend>背景声音</legend>
+        <div class="sound-choices">
+          <label><input type="radio" name="timer-sound" value="off" id="sound-off" checked>静音</label>
+          <label><input type="radio" name="timer-sound" value="noise">白噪音</label>
+          <label><input type="radio" name="timer-sound" value="music">轻音乐</label>
+        </div>
+      </fieldset>
+      <audio id="timer-audio" preload="none" loop></audio>
+      <div id="sound-status" role="status"></div>
+      <div class="actions">
+        <button class="primary" data-action="pause" id="pause-button">暂停计时</button>
+        <button class="secondary" data-action="close">结束练习</button>
+      </div>`);
+    const player = $("#timer-audio");
+    player.addEventListener("error", () => soundFailed(player));
+    $(".timer-sounds").addEventListener("change", updateTimerSound);
     tick();
     ticker = setInterval(tick,250);
   }
@@ -228,6 +280,7 @@
       case "pause":
         if(running) {tick(); if(!remaining) break; running=false;}
         else {finishAt=Date.now()+remaining*1000; running=true;tick();}
+        updateTimerSound();
         button.textContent = running ? "暂停计时" : "继续计时";
         break;
       case "mood":
@@ -267,7 +320,18 @@
         break;
     }
   });
-  dialog.addEventListener("close",()=>{clearInterval(ticker);running=false;});
+  dialog.addEventListener("close",()=>{
+    if (dialog.open) return;
+    clearInterval(ticker);
+    running = false;
+    $("#timer-audio")?.pause();
+  });
+  window.addEventListener("pagehide", () => {
+    if (dialog.open && $("#timer-audio")) {
+      $("#timer-audio").pause();
+      dialog.close();
+    }
+  });
   window.addEventListener("hashchange",()=>{if(dialog.open) dialog.close();showPage(true);});
   window.addEventListener("storage",updateDashboard);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden) updateDashboard();});
